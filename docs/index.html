@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SF small-lot explorer — single-stair eligible parcels</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --line: #262d36;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #f78166;
+    --accent-2: #4493f8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app { display: grid; grid-template-columns: 340px 1fr; height: 100vh; }
+  #sidebar { background: var(--panel); border-right: 1px solid var(--line);
+    padding: 16px 18px; overflow-y: auto; }
+  #map { height: 100%; background: #1a1f27; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  .group { border-top: 1px solid var(--line); padding: 14px 0; }
+  .group:first-of-type { border-top: 0; padding-top: 0; }
+  label { display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); margin-bottom: 6px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row input[type=number] { width: 70px; background: #0e1116; color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font: inherit; }
+  .row .unit { color: var(--muted); }
+  .range-pair { display: flex; align-items: center; gap: 8px; }
+  .range-pair span { color: var(--muted); }
+  select { width: 100%; background: #0e1116; color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; padding: 6px; font: inherit; }
+  .stat { display: flex; justify-content: space-between; align-items: baseline; }
+  .stat .n { font-size: 24px; font-weight: 600; color: var(--accent); }
+  .stat .pct { color: var(--muted); font-size: 12px; }
+  .preset { display: inline-block; padding: 4px 8px; margin: 4px 4px 0 0;
+    background: #0e1116; border: 1px solid var(--line); border-radius: 12px;
+    color: var(--text); font-size: 12px; cursor: pointer; }
+  .preset:hover { border-color: var(--accent-2); }
+  .legend { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  #hist { width: 100%; height: 90px; background: #0e1116; border: 1px solid var(--line);
+    border-radius: 4px; margin-top: 6px; }
+  .leaflet-popup-content-wrapper { background: var(--panel); color: var(--text); }
+  .leaflet-popup-tip { background: var(--panel); }
+  .popup b { color: var(--accent); }
+  .popup .grid { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin-top: 6px; }
+  .popup .grid span:nth-child(odd) { color: var(--muted); }
+  #loader { position: fixed; top: 50%; left: 60%; transform: translate(-50%,-50%);
+    background: rgba(0,0,0,.6); padding: 12px 20px; border-radius: 8px; color: white;
+    font-size: 14px; }
+  footer { font-size: 11px; color: var(--muted); margin-top: 14px; }
+  footer a { color: var(--accent-2); }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <h1>SF small-lot explorer</h1>
+    <div class="sub">Lots potentially eligible for single-stair small-multifamily.
+      Showing parcels with width 24–30 ft and length 80–120 ft;
+      narrow the filter below to focus.</div>
+
+    <div class="group">
+      <div class="stat">
+        <div><div class="n" id="count">—</div>
+          <div class="pct">matching parcels</div></div>
+        <div style="text-align:right">
+          <div class="n" id="pct">—</div>
+          <div class="pct">of 226,637 measured</div></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <label>Width (ft)</label>
+      <div class="range-pair">
+        <input type="number" id="wMin" min="24" max="30" step="0.5" value="24" />
+        <span>to</span>
+        <input type="number" id="wMax" min="24" max="30" step="0.5" value="30" />
+      </div>
+      <label style="margin-top:10px">Length (ft)</label>
+      <div class="range-pair">
+        <input type="number" id="lMin" min="80" max="120" step="1" value="80" />
+        <span>to</span>
+        <input type="number" id="lMax" min="80" max="120" step="1" value="120" />
+      </div>
+      <div>
+        <span class="preset" data-w="24,30" data-l="80,120">Flexible (24–30 × 80–120)</span>
+        <span class="preset" data-w="24,26" data-l="95,105">Ideal ~25 × 100</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <label>Neighborhood</label>
+      <select id="nbh"><option value="">All neighborhoods</option></select>
+      <label style="margin-top:10px">Zoning</label>
+      <select id="zon"><option value="">All zoning codes</option></select>
+    </div>
+
+    <div class="group">
+      <label>Distribution (width × length, current filter)</label>
+      <canvas id="hist" width="304" height="90"></canvas>
+      <div class="legend">x = width 24–30 ft, y = length 80–120 ft. Brighter = more lots.</div>
+    </div>
+
+    <footer>
+      Geometric filter only — doesn't check height limits, lot mergers, or existing
+      structures. Treat as the upper bound of the eligible pool.
+      <br/><br/>
+      Source: SF Open Data parcel layer (Active &amp; Retired), 2026-05-22.
+      Width/length from each parcel's minimum rotated rectangle in EPSG:2227.
+    </footer>
+  </aside>
+  <div id="map"></div>
+</div>
+
+<div id="loader">Loading 22 MB of parcel data…</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const SF_CENTER = [37.7749, -122.4400];
+const map = L.map('map', { preferCanvas: true, zoomControl: true })
+  .setView(SF_CENTER, 12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap, © CARTO'
+}).addTo(map);
+
+const canvasRenderer = L.canvas({ padding: 0.5 });
+let allFeatures = [];
+let layer = null;
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  wMin: $('wMin'), wMax: $('wMax'), lMin: $('lMin'), lMax: $('lMax'),
+  nbh: $('nbh'), zon: $('zon'),
+  count: $('count'), pct: $('pct'), hist: $('hist'),
+};
+
+const TOTAL_MEASURED = 226637;
+
+function styleFor(props) {
+  return {
+    color: '#f78166', weight: 0.8, fillColor: '#f78166',
+    fillOpacity: 0.55, renderer: canvasRenderer,
+  };
+}
+
+function popupHtml(p) {
+  const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa || '');
+  const street = [p.sn, p.st].filter(Boolean).join(' ');
+  return `<div class="popup">
+    <div><b>${addr} ${street}</b></div>
+    <div style="color:#8b949e">Block-lot ${p.b || '—'}</div>
+    <div class="grid">
+      <span>Width</span><span>${p.w} ft</span>
+      <span>Length</span><span>${p.l} ft</span>
+      <span>Area</span><span>${p.a} sq ft</span>
+      <span>Zoning</span><span>${p.z || '—'}</span>
+      <span>Neighborhood</span><span>${p.n || '—'}</span>
+      <span>Supervisor district</span><span>${p.sd || '—'}</span>
+    </div></div>`;
+}
+
+function passes(p, wMin, wMax, lMin, lMax, nbh, zon) {
+  if (p.w < wMin || p.w > wMax) return false;
+  if (p.l < lMin || p.l > lMax) return false;
+  if (nbh && p.n !== nbh) return false;
+  if (zon && p.z !== zon) return false;
+  return true;
+}
+
+function render() {
+  const wMin = +els.wMin.value, wMax = +els.wMax.value;
+  const lMin = +els.lMin.value, lMax = +els.lMax.value;
+  const nbh = els.nbh.value, zon = els.zon.value;
+
+  const filtered = allFeatures.filter(f =>
+    passes(f.properties, wMin, wMax, lMin, lMax, nbh, zon));
+
+  if (layer) map.removeLayer(layer);
+  layer = L.geoJSON({ type: 'FeatureCollection', features: filtered }, {
+    style: f => styleFor(f.properties),
+    onEachFeature: (f, l) => l.bindPopup(popupHtml(f.properties)),
+  }).addTo(map);
+
+  els.count.textContent = filtered.length.toLocaleString();
+  els.pct.textContent = (100 * filtered.length / TOTAL_MEASURED).toFixed(2) + '%';
+  drawHist(filtered);
+}
+
+function drawHist(features) {
+  const cnv = els.hist, ctx = cnv.getContext('2d');
+  const W = cnv.width, H = cnv.height;
+  ctx.clearRect(0, 0, W, H);
+  // 12 width buckets (24..30, 0.5ft), 40 length buckets (80..120, 1ft)
+  const wBins = 12, lBins = 40;
+  const grid = new Uint32Array(wBins * lBins);
+  let maxC = 0;
+  for (const f of features) {
+    const p = f.properties;
+    let wi = Math.floor((p.w - 24) * 2);
+    let li = Math.floor(p.l - 80);
+    if (wi < 0) wi = 0; if (wi >= wBins) wi = wBins - 1;
+    if (li < 0) li = 0; if (li >= lBins) li = lBins - 1;
+    const idx = li * wBins + wi;
+    grid[idx]++;
+    if (grid[idx] > maxC) maxC = grid[idx];
+  }
+  if (maxC === 0) return;
+  const cw = W / wBins, ch = H / lBins;
+  for (let li = 0; li < lBins; li++) {
+    for (let wi = 0; wi < wBins; wi++) {
+      const v = grid[li * wBins + wi];
+      if (!v) continue;
+      const t = Math.pow(v / maxC, 0.6);
+      ctx.fillStyle = `rgba(247,129,102,${0.15 + 0.85 * t})`;
+      // y axis: length 80 at bottom, 120 at top → invert
+      ctx.fillRect(wi * cw, (lBins - 1 - li) * ch, cw, ch);
+    }
+  }
+}
+
+function populateDropdowns() {
+  const nbCount = new Map(), zCount = new Map();
+  for (const f of allFeatures) {
+    const p = f.properties;
+    if (p.n) nbCount.set(p.n, (nbCount.get(p.n) || 0) + 1);
+    if (p.z) zCount.set(p.z, (zCount.get(p.z) || 0) + 1);
+  }
+  const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+  for (const [k, v] of sortDesc(nbCount)) {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
+    els.nbh.appendChild(o);
+  }
+  for (const [k, v] of sortDesc(zCount)) {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
+    els.zon.appendChild(o);
+  }
+}
+
+['wMin','wMax','lMin','lMax','nbh','zon'].forEach(id =>
+  $(id).addEventListener('change', render));
+
+document.querySelectorAll('.preset').forEach(el => {
+  el.addEventListener('click', () => {
+    const [wMin, wMax] = el.dataset.w.split(',');
+    const [lMin, lMax] = el.dataset.l.split(',');
+    els.wMin.value = wMin; els.wMax.value = wMax;
+    els.lMin.value = lMin; els.lMax.value = lMax;
+    render();
+  });
+});
+
+fetch('lots.geojson')
+  .then(r => r.json())
+  .then(data => {
+    allFeatures = data.features;
+    populateDropdowns();
+    render();
+    $('loader').remove();
+  })
+  .catch(err => {
+    $('loader').textContent = 'Failed to load lots.geojson: ' + err;
+  });
+</script>
+</body>
+</html>
