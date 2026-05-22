@@ -8,12 +8,14 @@ The target lot type is roughly **25 ft wide × 100 ft long**, the standard SF Vi
 
 ## Results
 
-| Band | Width | Length | Lots | % of all active parcels |
+| Band | Width | Length | Lots | % of residential-zoned lots |
 |---|---|---|---:|---:|
-| Ideal ~25×100 | 24–26 ft | 95–105 ft | **29,701** | 13.1% |
-| Flexible | 24–30 ft | 80–120 ft | **63,119** | 27.9% |
+| Ideal ~25×100 | 24–26 ft | 95–105 ft | **29,701** | 15.7% |
+| Flexible | 24–30 ft | 80–120 ft | **63,119** | 33.3% |
 
-Nearly **1 in 3 residentially-zoned SF lots** falls in the flexible band. The highest concentrations are in Excelsior, Noe Valley, Outer Mission, Visitacion Valley, Outer Richmond, and Sunset/Parkside.
+**1 in 3 residentially-zoned SF lots** falls in the flexible band. The highest concentrations are in Excelsior, Noe Valley, Outer Mission, Visitacion Valley, Outer Richmond, and Sunset/Parkside.
+
+The denominator is **189,636 residential-zoned lots** (zoning codes starting with RH, RM, RTO, RC, NC, NCT). The full parcel dataset contains 226,637 active parcels, but the remainder are parks, public facilities, commercial and industrial sites, and other land that is not a candidate for small-lot residential development.
 
 ---
 
