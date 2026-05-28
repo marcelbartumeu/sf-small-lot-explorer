@@ -3,195 +3,402 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>SF small-lot explorer — single-stair eligible parcels</title>
+<title>SF Small-Lot Explorer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-  :root {
-    --bg: #f0ede8;
-    --panel: #faf9f7;
-    --line: #e0dbd4;
-    --text: #1c1917;
-    --muted: #78716c;
-    --accent: #c04f2e;
-    --accent-2: #1d4ed8;
-    --input-bg: #ffffff;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  #sidebar {
-    background: var(--panel);
-    border-right: 1px solid var(--line);
-    padding: 20px 18px 16px;
-    overflow-y: auto;
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #f2f2f7;
+  }
+
+  /* Map fills the whole viewport */
+  #map {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* Floating frosted-glass panel */
+  #panel {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    bottom: 16px;
+    width: 296px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-radius: 20px;
+    border: 0.5px solid rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.04),
+      0 8px 24px rgba(0,0,0,0.08),
+      0 24px 64px rgba(0,0,0,0.06);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    overflow: hidden;
   }
-  #map { height: 100%; }
 
-  /* Header */
-  .header { margin-bottom: 16px; }
-  .header h1 { font-size: 15px; font-weight: 700; margin: 0 0 2px;
-    letter-spacing: -.01em; color: var(--text); }
-  .header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  #panel-inner {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px 20px;
+    scrollbar-width: none;
+  }
+  #panel-inner::-webkit-scrollbar { display: none; }
 
-  /* Stat block */
-  .stat-block { display: flex; justify-content: space-between; align-items: flex-start;
-    background: #fff; border: 1px solid var(--line); border-radius: 6px;
-    padding: 12px 14px; margin-bottom: 14px; }
-  .stat-item { display: flex; flex-direction: column; }
-  .stat-n { font-size: 22px; font-weight: 700; color: var(--accent); line-height: 1; }
-  .stat-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  /* Typography */
+  .title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    color: #1d1d1f;
+    line-height: 1.2;
+    margin-bottom: 5px;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #8e8e93;
+    line-height: 1.45;
+    margin-bottom: 22px;
+  }
 
-  /* Section */
-  .section { border-top: 1px solid var(--line); padding: 12px 0; }
-  .section:first-of-type { border-top: none; padding-top: 0; }
-  label { display: block; font-size: 10.5px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: .06em;
-    color: var(--muted); margin-bottom: 6px; }
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+  .stat-card {
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 12px;
+    padding: 12px 13px;
+  }
+  .stat-card .n {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #0071e3;
+    line-height: 1;
+  }
+  .stat-card .lbl {
+    font-size: 11px;
+    color: #8e8e93;
+    margin-top: 4px;
+    line-height: 1.3;
+  }
 
-  /* Inputs */
-  .range-pair { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
-  .range-pair span { color: var(--muted); font-size: 12px; }
+  /* Section label */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8e8e93;
+    margin-bottom: 8px;
+    margin-top: 20px;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* Dimension inputs */
+  .dim-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .dim-row label {
+    font-size: 13px;
+    color: #1d1d1f;
+    width: 50px;
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+  .dim-row .sep {
+    font-size: 13px;
+    color: #8e8e93;
+    flex-shrink: 0;
+  }
   input[type=number] {
-    width: 68px; background: var(--input-bg); color: var(--text);
-    border: 1px solid var(--line); border-radius: 4px;
-    padding: 5px 7px; font: inherit; font-size: 13px;
-    transition: border-color .15s;
+    flex: 1;
+    min-width: 0;
+    background: rgba(118, 118, 128, 0.12);
+    border: none;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1d1d1f;
+    text-align: center;
+    transition: background 0.15s;
+    -moz-appearance: textfield;
   }
-  input[type=number]:focus { outline: none; border-color: var(--accent-2); }
-
-  select {
-    width: 100%; background: var(--input-bg); color: var(--text);
-    border: 1px solid var(--line); border-radius: 4px;
-    padding: 6px 8px; font: inherit; font-size: 13px;
-    transition: border-color .15s; appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2378716c' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 8px center;
-    padding-right: 26px;
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type=number]:focus {
+    outline: none;
+    background: rgba(0, 113, 227, 0.12);
   }
-  select:focus { outline: none; border-color: var(--accent-2); }
-  select + select { margin-top: 8px; }
 
-  /* Presets */
-  .presets { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  /* Segmented presets */
+  .presets {
+    display: flex;
+    background: rgba(118, 118, 128, 0.12);
+    border-radius: 10px;
+    padding: 2px;
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
   .preset {
-    padding: 4px 10px; background: var(--input-bg);
-    border: 1px solid var(--line); border-radius: 20px;
-    color: var(--text); font-size: 11.5px; cursor: pointer;
-    transition: border-color .15s, background .15s;
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #6e6e73;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+    line-height: 1.3;
+    user-select: none;
   }
-  .preset:hover { border-color: var(--accent-2); background: #eff6ff; color: var(--accent-2); }
+  .preset.active, .preset:hover {
+    background: #ffffff;
+    color: #0071e3;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  /* Dropdowns */
+  select {
+    width: 100%;
+    background: rgba(118, 118, 128, 0.12);
+    border: none;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font: inherit;
+    font-size: 13px;
+    color: #1d1d1f;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238e8e93'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 30px;
+    transition: background 0.15s;
+  }
+  select + select { margin-top: 8px; }
+  select:focus { outline: none; background-color: rgba(0,113,227,0.1); }
 
   /* Heatmap */
-  #hist { width: 100%; height: 84px; background: var(--input-bg);
-    border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; display: block; }
-  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
-
-  /* Popup */
-  .leaflet-popup-content-wrapper {
-    background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  #hist {
+    width: 100%;
+    height: 80px;
+    display: block;
+    border-radius: 10px;
+    background: rgba(118, 118, 128, 0.08);
+    margin-top: 8px;
   }
-  .leaflet-popup-tip { background: var(--panel); }
-  .leaflet-popup-content { margin: 12px 14px; }
-  .popup-title { font-weight: 700; font-size: 13px; color: var(--accent); }
-  .popup-sub { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
-  .popup-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 12px; }
-  .popup-grid .k { color: var(--muted); }
-  .popup-grid .v { font-weight: 600; }
+  .hist-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #aeaeb2;
+    margin-top: 4px;
+    padding: 0 2px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+    font-size: 11.5px;
+    color: #8e8e93;
+  }
+  .legend-swatch {
+    width: 14px; height: 14px;
+    border-radius: 4px;
+    background: rgba(0, 113, 227, 0.45);
+    border: 1.5px solid #0071e3;
+    flex-shrink: 0;
+  }
+
+  /* Hairline divider */
+  .divider {
+    height: 0.5px;
+    background: rgba(0,0,0,0.1);
+    margin: 18px 0;
+  }
+
+  /* Footer */
+  .footer-note {
+    font-size: 10.5px;
+    color: #aeaeb2;
+    line-height: 1.5;
+    padding: 16px 20px;
+    border-top: 0.5px solid rgba(0,0,0,0.08);
+  }
 
   /* Loader */
   #loader {
-    position: fixed; top: 50%; left: calc(160px + 50%);
+    position: fixed;
+    top: 50%;
+    left: calc(160px + 50%);
     transform: translate(-50%, -50%);
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 8px; padding: 12px 20px;
-    font-size: 13px; color: var(--muted);
-    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 14px;
+    border: 0.5px solid rgba(0,0,0,0.08);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    padding: 14px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #6e6e73;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,113,227,0.2);
+    border-top-color: #0071e3;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Leaflet popup */
+  .leaflet-popup-content-wrapper {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 14px;
+    border: 0.5px solid rgba(0,0,0,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    padding: 0;
+    overflow: hidden;
+  }
+  .leaflet-popup-content { margin: 0; }
+  .leaflet-popup-tip-container { display: none; }
+  .leaflet-popup-close-button {
+    color: #8e8e93 !important;
+    font-size: 18px !important;
+    top: 10px !important;
+    right: 12px !important;
   }
 
-  footer { font-size: 11px; color: var(--muted); margin-top: auto; padding-top: 14px;
-    border-top: 1px solid var(--line); line-height: 1.5; }
+  .popup-body { padding: 16px 18px 18px; }
+  .popup-addr { font-size: 14px; font-weight: 700; color: #1d1d1f;
+    letter-spacing: -0.2px; padding-right: 18px; }
+  .popup-blklot { font-size: 11px; color: #8e8e93; margin-top: 2px; margin-bottom: 12px; }
+  .popup-grid { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; }
+  .popup-grid .k { font-size: 12px; color: #8e8e93; }
+  .popup-grid .v { font-size: 12px; font-weight: 600; color: #1d1d1f; }
 
-  /* Legend dot */
-  .legend-row { display: flex; align-items: center; gap: 6px;
-    font-size: 11.5px; color: var(--muted); margin-top: 8px; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0;
-    background: rgba(29,78,216,0.55); border: 1.5px solid #1d4ed8; }
+  /* Leaflet control styling */
+  .leaflet-control-zoom {
+    border: none !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1) !important;
+  }
+  .leaflet-control-zoom a {
+    background: rgba(255,255,255,0.9) !important;
+    backdrop-filter: blur(10px);
+    color: #1d1d1f !important;
+    border: none !important;
+    font-size: 16px !important;
+    line-height: 28px !important;
+    width: 30px !important;
+    height: 30px !important;
+  }
+  .leaflet-control-zoom a:hover { background: white !important; }
 </style>
 </head>
 <body>
-<div id="app">
-  <aside id="sidebar">
 
-    <div class="header">
-      <h1>SF Small-Lot Explorer</h1>
-      <p>Parcels potentially eligible for single-stair small-multifamily development under proposed code reform.</p>
-    </div>
+<div id="map"></div>
 
-    <div class="stat-block">
-      <div class="stat-item">
-        <div class="stat-n" id="count">—</div>
-        <div class="stat-label">matching parcels</div>
-      </div>
-      <div class="stat-item" style="text-align:right">
-        <div class="stat-n" id="pct">—</div>
-        <div class="stat-label">of residential-zoned lots</div>
-      </div>
-    </div>
+<div id="panel">
+  <div id="panel-inner">
 
-    <div class="section">
-      <label>Width (ft)</label>
-      <div class="range-pair">
-        <input type="number" id="wMin" min="24" max="30" step="0.5" value="24" />
-        <span>to</span>
-        <input type="number" id="wMax" min="24" max="30" step="0.5" value="30" />
+    <div class="title">SF Small-Lot Explorer</div>
+    <div class="subtitle">Parcels potentially eligible for single-stair small-multifamily development under proposed code reform.</div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="n" id="count">—</div>
+        <div class="lbl">matching parcels</div>
       </div>
-      <label>Length (ft)</label>
-      <div class="range-pair" style="margin-bottom:0">
-        <input type="number" id="lMin" min="80" max="120" step="1" value="80" />
-        <span>to</span>
-        <input type="number" id="lMax" min="80" max="120" step="1" value="120" />
-      </div>
-      <div class="presets">
-        <span class="preset" data-w="24,30" data-l="80,120">Flexible 24–30 × 80–120</span>
-        <span class="preset" data-w="24,26" data-l="95,105">Ideal ~25 × 100</span>
+      <div class="stat-card">
+        <div class="n" id="pct">—</div>
+        <div class="lbl">of residential‑zoned lots</div>
       </div>
     </div>
 
-    <div class="section">
-      <label>Neighborhood</label>
-      <select id="nbh"><option value="">All neighborhoods</option></select>
-      <label style="margin-top:10px">Zoning</label>
-      <select id="zon"><option value="">All zoning codes</option></select>
+    <div class="section-label">Dimensions</div>
+
+    <div class="dim-row">
+      <label>Width</label>
+      <input type="number" id="wMin" min="24" max="30" step="0.5" value="24" />
+      <span class="sep">–</span>
+      <input type="number" id="wMax" min="24" max="30" step="0.5" value="30" />
+    </div>
+    <div class="dim-row">
+      <label>Length</label>
+      <input type="number" id="lMin" min="80" max="120" step="1" value="80" />
+      <span class="sep">–</span>
+      <input type="number" id="lMax" min="80" max="120" step="1" value="120" />
     </div>
 
-    <div class="section">
-      <label>Width × Length distribution</label>
-      <canvas id="hist" width="284" height="84"></canvas>
-      <div class="hint">x = width 24–30 ft &nbsp;·&nbsp; y = length 80–120 ft &nbsp;·&nbsp; darker = denser</div>
-      <div class="legend-row"><div class="legend-dot"></div> Single-stair eligible parcel</div>
+    <div class="presets">
+      <div class="preset active" data-w="24,30" data-l="80,120">Flexible<br/>24–30 × 80–120</div>
+      <div class="preset" data-w="24,26" data-l="95,105">Ideal<br/>~25 × 100</div>
     </div>
 
-    <footer>
-      Geometric filter only — does not account for height limits, setbacks, existing
-      structures, or lot mergers. Treat as the upper bound of the eligible pool.
-      <br/><br/>
-      Source: SF Open Data parcel layer (Active &amp; Retired), 2026-05-22.
-      Width/length from minimum rotated rectangle, EPSG:2227.
-    </footer>
+    <div class="divider"></div>
 
-  </aside>
-  <div id="map"></div>
+    <div class="section-label">Filter</div>
+    <select id="nbh"><option value="">All neighborhoods</option></select>
+    <select id="zon"><option value="">All zoning codes</option></select>
+
+    <div class="divider"></div>
+
+    <div class="section-label">Distribution</div>
+    <canvas id="hist" width="256" height="80"></canvas>
+    <div class="hist-labels">
+      <span>24 ft wide</span><span>30 ft wide</span>
+    </div>
+
+    <div class="legend">
+      <div class="legend-swatch"></div>
+      Single-stair eligible parcel
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    Geometric filter only — does not check height limits, setbacks, or existing structures.
+    Source: SF Open Data, 2026-05-22. Dimensions from minimum rotated rectangle in EPSG:2227.
+  </div>
 </div>
 
-<div id="loader">Loading parcel data…</div>
+<div id="loader">
+  <div class="spinner"></div>
+  Loading parcel data…
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -200,17 +407,19 @@ const SF_CENTER = [37.7749, -122.4400];
 const map = L.map('map', { preferCanvas: true, zoomControl: true })
   .setView(SF_CENTER, 13);
 
-// Esri World Street Map — matches SF Planning GIS basemap style
+// CartoDB Voyager — clean, modern, muted-colour basemap
 L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
   {
     maxZoom: 19,
-    attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, ' +
-      'Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+    attribution: '© OpenStreetMap contributors © CARTO'
   }
 ).addTo(map);
 
-const canvasRenderer = L.canvas({ padding: 0.5 });
+// Move zoom control to bottom-right
+map.zoomControl.setPosition('bottomright');
+
+const renderer = L.canvas({ padding: 0.5 });
 let allFeatures = [];
 let layer = null;
 
@@ -223,24 +432,27 @@ const els = {
 const TOTAL_RESIDENTIAL = 189636;
 
 const LOT_STYLE = {
-  color: '#1d4ed8', weight: 1, fillColor: '#3b82f6',
-  fillOpacity: 0.45, renderer: canvasRenderer,
+  color: '#0071e3',
+  weight: 0.8,
+  fillColor: '#0071e3',
+  fillOpacity: 0.38,
+  renderer,
 };
 
 function popupHtml(p) {
   const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa || '');
   const street = [p.sn, p.st].filter(Boolean).join(' ');
   const rows = [
-    ['Width',     `${p.w} ft`],
-    ['Length',    `${p.l} ft`],
-    ['Area',      `${Number(p.a).toLocaleString()} sq ft`],
-    ['Zoning',    p.z || '—'],
-    ['Neighborhood', p.n || '—'],
-    ['Supervisor', `District ${p.sd || '—'}`],
+    ['Width',        `${p.w} ft`],
+    ['Length',       `${p.l} ft`],
+    ['Area',         `${Number(p.a).toLocaleString()} sq ft`],
+    ['Zoning',       p.z  || '—'],
+    ['Neighborhood', p.n  || '—'],
+    ['Supervisor',   p.sd ? `District ${p.sd}` : '—'],
   ];
-  return `<div>
-    <div class="popup-title">${addr} ${street}</div>
-    <div class="popup-sub">Block-lot ${p.b || '—'}</div>
+  return `<div class="popup-body">
+    <div class="popup-addr">${addr} ${street}</div>
+    <div class="popup-blklot">Block-lot ${p.b || '—'}</div>
     <div class="popup-grid">${rows.map(([k,v]) =>
       `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}
     </div></div>`;
@@ -248,13 +460,13 @@ function popupHtml(p) {
 
 function passes(p, wMin, wMax, lMin, lMax, nbh, zon) {
   return p.w >= wMin && p.w <= wMax && p.l >= lMin && p.l <= lMax
-    && (!nbh || p.n === nbh) && (!zon || p.z === zon);
+      && (!nbh || p.n === nbh) && (!zon || p.z === zon);
 }
 
 function render() {
   const wMin = +els.wMin.value, wMax = +els.wMax.value;
   const lMin = +els.lMin.value, lMax = +els.lMax.value;
-  const nbh = els.nbh.value, zon = els.zon.value;
+  const nbh  = els.nbh.value,  zon  = els.zon.value;
 
   const filtered = allFeatures.filter(f =>
     passes(f.properties, wMin, wMax, lMin, lMax, nbh, zon));
@@ -262,15 +474,15 @@ function render() {
   if (layer) map.removeLayer(layer);
   layer = L.geoJSON({ type: 'FeatureCollection', features: filtered }, {
     style: () => LOT_STYLE,
-    onEachFeature: (f, l) => l.bindPopup(popupHtml(f.properties), { maxWidth: 260 }),
+    onEachFeature: (f, l) => l.bindPopup(popupHtml(f.properties), { maxWidth: 240 }),
   }).addTo(map);
 
   els.count.textContent = filtered.length.toLocaleString();
   els.pct.textContent   = (100 * filtered.length / TOTAL_RESIDENTIAL).toFixed(1) + '%';
-  drawHist(filtered, wMin, wMax, lMin, lMax);
+  drawHist(filtered);
 }
 
-function drawHist(features, wMin, wMax, lMin, lMax) {
+function drawHist(features) {
   const cnv = els.hist, ctx = cnv.getContext('2d');
   const W = cnv.width, H = cnv.height;
   ctx.clearRect(0, 0, W, H);
@@ -279,8 +491,8 @@ function drawHist(features, wMin, wMax, lMin, lMax) {
   let maxC = 0;
   for (const f of features) {
     const p = f.properties;
-    let wi = Math.min(wBins - 1, Math.max(0, Math.floor((p.w - 24) * 2)));
-    let li = Math.min(lBins - 1, Math.max(0, Math.floor(p.l - 80)));
+    const wi = Math.min(wBins-1, Math.max(0, Math.floor((p.w - 24) * 2)));
+    const li = Math.min(lBins-1, Math.max(0, Math.floor(p.l - 80)));
     const idx = li * wBins + wi;
     grid[idx]++;
     if (grid[idx] > maxC) maxC = grid[idx];
@@ -291,39 +503,37 @@ function drawHist(features, wMin, wMax, lMin, lMax) {
     for (let wi = 0; wi < wBins; wi++) {
       const v = grid[li * wBins + wi];
       if (!v) continue;
-      const t = Math.pow(v / maxC, 0.55);
-      // Blue palette matching parcel color
-      ctx.fillStyle = `rgba(59,130,246,${0.12 + 0.88 * t})`;
+      const t = Math.pow(v / maxC, 0.5);
+      ctx.fillStyle = `rgba(0,113,227,${0.08 + 0.82 * t})`;
       ctx.fillRect(wi * cw, (lBins - 1 - li) * ch, cw, ch);
     }
   }
 }
 
 function populateDropdowns() {
-  const nbCount = new Map(), zCount = new Map();
-  for (const f of allFeatures) {
-    const p = f.properties;
-    if (p.n) nbCount.set(p.n, (nbCount.get(p.n) || 0) + 1);
-    if (p.z) zCount.set(p.z, (zCount.get(p.z) || 0) + 1);
+  const nbMap = new Map(), zMap = new Map();
+  for (const { properties: p } of allFeatures) {
+    if (p.n) nbMap.set(p.n, (nbMap.get(p.n) || 0) + 1);
+    if (p.z)  zMap.set(p.z,  (zMap.get(p.z)  || 0) + 1);
   }
-  const sortDesc = m => [...m.entries()].sort((a, b) => b[1] - a[1]);
-  for (const [k, v] of sortDesc(nbCount)) {
+  const sorted = m => [...m.entries()].sort((a, b) => b[1] - a[1]);
+  for (const [k, v] of sorted(nbMap)) {
     const o = document.createElement('option');
     o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
     els.nbh.appendChild(o);
   }
-  for (const [k, v] of sortDesc(zCount)) {
+  for (const [k, v] of sorted(zMap)) {
     const o = document.createElement('option');
     o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
     els.zon.appendChild(o);
   }
 }
 
-['wMin','wMax','lMin','lMax','nbh','zon'].forEach(id =>
-  $(id).addEventListener('change', render));
-
+// Preset segmented control
 document.querySelectorAll('.preset').forEach(el => {
   el.addEventListener('click', () => {
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
     const [wMin, wMax] = el.dataset.w.split(',');
     const [lMin, lMax] = el.dataset.l.split(',');
     els.wMin.value = wMin; els.wMax.value = wMax;
@@ -331,6 +541,15 @@ document.querySelectorAll('.preset').forEach(el => {
     render();
   });
 });
+
+// Deactivate preset on manual input
+['wMin','wMax','lMin','lMax'].forEach(id =>
+  $(id).addEventListener('change', () => {
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+    render();
+  }));
+
+['nbh','zon'].forEach(id => $(id).addEventListener('change', render));
 
 fetch('lots.geojson')
   .then(r => r.json())
@@ -341,7 +560,7 @@ fetch('lots.geojson')
     $('loader').remove();
   })
   .catch(err => {
-    $('loader').textContent = 'Failed to load lots.geojson — ' + err;
+    $('loader').innerHTML = '⚠️ ' + err;
   });
 </script>
 </body>
