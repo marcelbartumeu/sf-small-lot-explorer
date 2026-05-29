@@ -148,6 +148,33 @@
     background: rgba(0, 113, 227, 0.12);
   }
 
+  /* City switcher */
+  .city-switch {
+    display: flex;
+    background: rgba(118, 118, 128, 0.12);
+    border-radius: 10px;
+    padding: 2px;
+    margin-bottom: 20px;
+  }
+  .city-btn {
+    flex: 1;
+    text-align: center;
+    padding: 7px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6e6e73;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+    user-select: none;
+    line-height: 1.3;
+  }
+  .city-btn.active {
+    background: #ffffff;
+    color: #0071e3;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  }
+
   /* Segmented presets */
   .presets {
     display: flex;
@@ -334,8 +361,13 @@
 <div id="panel">
   <div id="panel-inner">
 
-    <div class="title">SF Small-Lot Explorer</div>
+    <div class="title">Small-Lot Explorer</div>
     <div class="subtitle">Parcels potentially eligible for single-stair small-multifamily development under proposed code reform.</div>
+
+    <div class="city-switch">
+      <div class="city-btn active" data-city="sf">San Francisco</div>
+      <div class="city-btn" data-city="cc">Culver City</div>
+    </div>
 
     <div class="stats">
       <div class="stat-card">
@@ -370,7 +402,7 @@
 
     <div class="divider"></div>
 
-    <div class="section-label">Filter</div>
+    <div class="section-label" data-filter>Neighborhood</div>
     <select id="nbh"><option value="">All neighborhoods</option></select>
     <select id="zon"><option value="">All zoning codes</option></select>
 
@@ -397,88 +429,113 @@
 
 <div id="loader">
   <div class="spinner"></div>
-  Loading parcel data…
+  <span>Loading parcel data…</span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-const SF_CENTER = [37.7749, -122.4400];
-const map = L.map('map', { preferCanvas: true, zoomControl: true })
-  .setView(SF_CENTER, 13);
+const CITIES = {
+  sf: {
+    center: [37.7749, -122.4400], zoom: 13,
+    file: 'lots.geojson',
+    totalResidential: 189636,
+    residentialLabel: 'of residential-zoned lots',
+    // property keys in the geojson
+    keys: { w: 'w', l: 'l', area: 'a', zoning: 'z', label: 'n', labelKey: 'n' },
+    popupFn: p => {
+      const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa || '');
+      const street = [p.sn, p.st].filter(Boolean).join(' ');
+      return { title: `${addr} ${street}`, sub: `Block-lot ${p.b || '—'}`,
+        rows: [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
+               ['Area',`${Number(p.a).toLocaleString()} sq ft`],
+               ['Zoning', p.z||'—'],['Neighborhood', p.n||'—'],
+               ['Supervisor', p.sd ? `District ${p.sd}` : '—']] };
+    },
+    filterLabel: 'Neighborhood',
+    filterKey: 'n',
+  },
+  cc: {
+    center: [34.0084, -118.4092], zoom: 14,
+    file: 'cc_lots.geojson',
+    totalResidential: 7401,
+    residentialLabel: 'of residential-zoned lots',
+    keys: { w: 'w', l: 'l', area: 'sq', zoning: 'z' },
+    popupFn: p => ({
+      title: p.ad || '—', sub: `APN ${p.a || '—'}`,
+      rows: [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
+             ['Area',`${Number(p.sq).toLocaleString()} sq ft`],
+             ['Zoning', p.z||'—'],['Zoning name', p.zf||'—']],
+    }),
+    filterLabel: 'Zoning',
+    filterKey: 'z',
+  },
+};
 
-// Esri World Topo Map — warm beige-tan, terrain relief, green parks
+let currentCity = 'sf';
+let allFeatures = [];
+let layer = null;
+let cityData = {};  // cache loaded data per city
+
+const map = L.map('map', { preferCanvas: true, zoomControl: true })
+  .setView(CITIES.sf.center, CITIES.sf.zoom);
+
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-  {
-    maxZoom: 19,
-    attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
-  }
+  { maxZoom: 19, attribution: 'Tiles © Esri' }
 ).addTo(map);
 
-// Move zoom control to bottom-right
 map.zoomControl.setPosition('bottomright');
 
 const renderer = L.canvas({ padding: 0.5 });
-let allFeatures = [];
-let layer = null;
 
 const $ = id => document.getElementById(id);
 const els = {
   wMin: $('wMin'), wMax: $('wMax'), lMin: $('lMin'), lMax: $('lMax'),
   nbh: $('nbh'), zon: $('zon'), count: $('count'), pct: $('pct'), hist: $('hist'),
+  filterLabel: document.querySelector('label[for="nbh"]'),
 };
 
-const TOTAL_RESIDENTIAL = 189636;
-
-const LOT_STYLE = {
-  color: '#0071e3',
-  weight: 0.8,
-  fillColor: '#0071e3',
-  fillOpacity: 0.38,
-  renderer,
-};
+const LOT_STYLE = { color:'#0071e3', weight:0.8, fillColor:'#0071e3', fillOpacity:0.38, renderer };
 
 function popupHtml(p) {
-  const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa || '');
-  const street = [p.sn, p.st].filter(Boolean).join(' ');
-  const rows = [
-    ['Width',        `${p.w} ft`],
-    ['Length',       `${p.l} ft`],
-    ['Area',         `${Number(p.a).toLocaleString()} sq ft`],
-    ['Zoning',       p.z  || '—'],
-    ['Neighborhood', p.n  || '—'],
-    ['Supervisor',   p.sd ? `District ${p.sd}` : '—'],
-  ];
+  const cfg = CITIES[currentCity];
+  const { title, sub, rows } = cfg.popupFn(p);
   return `<div class="popup-body">
-    <div class="popup-addr">${addr} ${street}</div>
-    <div class="popup-blklot">Block-lot ${p.b || '—'}</div>
+    <div class="popup-addr">${title}</div>
+    <div class="popup-blklot">${sub}</div>
     <div class="popup-grid">${rows.map(([k,v]) =>
       `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}
     </div></div>`;
 }
 
-function passes(p, wMin, wMax, lMin, lMax, nbh, zon) {
-  return p.w >= wMin && p.w <= wMax && p.l >= lMin && p.l <= lMax
-      && (!nbh || p.n === nbh) && (!zon || p.z === zon);
+function passes(p, wMin, wMax, lMin, lMax, filterVal, zon) {
+  const cfg = CITIES[currentCity];
+  const w = p[cfg.keys.w], l = p[cfg.keys.l];
+  if (!w || !l) return false;
+  if (w < wMin || w > wMax || l < lMin || l > lMax) return false;
+  if (filterVal && p[cfg.filterKey] !== filterVal) return false;
+  if (zon && p[cfg.keys.zoning] !== zon) return false;
+  return true;
 }
 
 function render() {
   const wMin = +els.wMin.value, wMax = +els.wMax.value;
   const lMin = +els.lMin.value, lMax = +els.lMax.value;
-  const nbh  = els.nbh.value,  zon  = els.zon.value;
+  const filterVal = els.nbh.value, zon = els.zon.value;
 
   const filtered = allFeatures.filter(f =>
-    passes(f.properties, wMin, wMax, lMin, lMax, nbh, zon));
+    passes(f.properties, wMin, wMax, lMin, lMax, filterVal, zon));
 
   if (layer) map.removeLayer(layer);
-  layer = L.geoJSON({ type: 'FeatureCollection', features: filtered }, {
+  layer = L.geoJSON({ type:'FeatureCollection', features: filtered }, {
     style: () => LOT_STYLE,
     onEachFeature: (f, l) => l.bindPopup(popupHtml(f.properties), { maxWidth: 240 }),
   }).addTo(map);
 
+  const cfg = CITIES[currentCity];
   els.count.textContent = filtered.length.toLocaleString();
-  els.pct.textContent   = (100 * filtered.length / TOTAL_RESIDENTIAL).toFixed(1) + '%';
+  els.pct.textContent   = (100 * filtered.length / cfg.totalResidential).toFixed(1) + '%';
   drawHist(filtered);
 }
 
@@ -489,45 +546,93 @@ function drawHist(features) {
   const wBins = 12, lBins = 40;
   const grid = new Uint32Array(wBins * lBins);
   let maxC = 0;
-  for (const f of features) {
-    const p = f.properties;
-    const wi = Math.min(wBins-1, Math.max(0, Math.floor((p.w - 24) * 2)));
-    const li = Math.min(lBins-1, Math.max(0, Math.floor(p.l - 80)));
-    const idx = li * wBins + wi;
-    grid[idx]++;
-    if (grid[idx] > maxC) maxC = grid[idx];
+  const cfg = CITIES[currentCity];
+  for (const { properties: p } of features) {
+    const wi = Math.min(wBins-1, Math.max(0, Math.floor((p[cfg.keys.w] - 24) * 2)));
+    const li = Math.min(lBins-1, Math.max(0, Math.floor(p[cfg.keys.l] - 80)));
+    grid[li * wBins + wi]++;
+    if (grid[li * wBins + wi] > maxC) maxC = grid[li * wBins + wi];
   }
   if (!maxC) return;
   const cw = W / wBins, ch = H / lBins;
-  for (let li = 0; li < lBins; li++) {
+  for (let li = 0; li < lBins; li++)
     for (let wi = 0; wi < wBins; wi++) {
       const v = grid[li * wBins + wi];
       if (!v) continue;
-      const t = Math.pow(v / maxC, 0.5);
-      ctx.fillStyle = `rgba(0,113,227,${0.08 + 0.82 * t})`;
-      ctx.fillRect(wi * cw, (lBins - 1 - li) * ch, cw, ch);
+      ctx.fillStyle = `rgba(0,113,227,${0.08 + 0.82 * Math.pow(v/maxC, 0.5)})`;
+      ctx.fillRect(wi * cw, (lBins-1-li) * ch, cw, ch);
     }
-  }
 }
 
 function populateDropdowns() {
-  const nbMap = new Map(), zMap = new Map();
+  const cfg = CITIES[currentCity];
+  // Primary filter (neighborhood for SF, zoning for CC)
+  els.nbh.innerHTML = `<option value="">All ${cfg.filterLabel.toLowerCase()}s</option>`;
+  // Secondary filter (zoning)
+  els.zon.innerHTML = '<option value="">All zoning codes</option>';
+
+  const fMap = new Map(), zMap = new Map();
   for (const { properties: p } of allFeatures) {
-    if (p.n) nbMap.set(p.n, (nbMap.get(p.n) || 0) + 1);
-    if (p.z)  zMap.set(p.z,  (zMap.get(p.z)  || 0) + 1);
+    const fv = p[cfg.filterKey], zv = p[cfg.keys.zoning];
+    if (fv) fMap.set(fv, (fMap.get(fv)||0)+1);
+    if (zv) zMap.set(zv, (zMap.get(zv)||0)+1);
   }
-  const sorted = m => [...m.entries()].sort((a, b) => b[1] - a[1]);
-  for (const [k, v] of sorted(nbMap)) {
+  const sorted = m => [...m.entries()].sort((a,b) => b[1]-a[1]);
+  for (const [k,v] of sorted(fMap)) {
     const o = document.createElement('option');
     o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
     els.nbh.appendChild(o);
   }
-  for (const [k, v] of sorted(zMap)) {
+  for (const [k,v] of sorted(zMap)) {
     const o = document.createElement('option');
     o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
     els.zon.appendChild(o);
   }
+  // Update label
+  document.querySelector('.section-label[data-filter]').textContent = cfg.filterLabel;
 }
+
+function loadCity(cityKey) {
+  currentCity = cityKey;
+  const cfg = CITIES[cityKey];
+
+  // Update city buttons
+  document.querySelectorAll('.city-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.city === cityKey));
+
+  // Fly to city
+  map.flyTo(cfg.center, cfg.zoom, { duration: 1.2 });
+
+  // Clear existing layer
+  if (layer) { map.removeLayer(layer); layer = null; }
+  els.count.textContent = '—'; els.pct.textContent = '—';
+
+  // Use cache if available
+  if (cityData[cityKey]) {
+    allFeatures = cityData[cityKey];
+    populateDropdowns(); render(); return;
+  }
+
+  $('loader').style.display = 'flex';
+  $('loader').querySelector('span').textContent = `Loading ${cfg.file}…`;
+
+  fetch(cfg.file)
+    .then(r => r.json())
+    .then(data => {
+      cityData[cityKey] = data.features;
+      allFeatures = data.features;
+      populateDropdowns();
+      render();
+      $('loader').style.display = 'none';
+    })
+    .catch(err => {
+      $('loader').querySelector('span').textContent = '⚠️ ' + err;
+    });
+}
+
+// City switcher
+document.querySelectorAll('.city-btn').forEach(el =>
+  el.addEventListener('click', () => loadCity(el.dataset.city)));
 
 // Preset segmented control
 document.querySelectorAll('.preset').forEach(el => {
@@ -542,7 +647,6 @@ document.querySelectorAll('.preset').forEach(el => {
   });
 });
 
-// Deactivate preset on manual input
 ['wMin','wMax','lMin','lMax'].forEach(id =>
   $(id).addEventListener('change', () => {
     document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
@@ -551,16 +655,19 @@ document.querySelectorAll('.preset').forEach(el => {
 
 ['nbh','zon'].forEach(id => $(id).addEventListener('change', render));
 
+// Initial load
+$('loader').style.display = 'flex';
 fetch('lots.geojson')
   .then(r => r.json())
   .then(data => {
+    cityData['sf'] = data.features;
     allFeatures = data.features;
     populateDropdowns();
     render();
-    $('loader').remove();
+    $('loader').style.display = 'none';
   })
   .catch(err => {
-    $('loader').innerHTML = '⚠️ ' + err;
+    $('loader').querySelector('span').textContent = '⚠️ ' + err;
   });
 </script>
 </body>
