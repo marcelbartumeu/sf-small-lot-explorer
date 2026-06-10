@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>SF Small-Lot Explorer</title>
+<title>Small-Lot Explorer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
@@ -16,340 +16,222 @@
     background: #f2f2f7;
   }
 
-  /* Map fills the whole viewport */
-  #map {
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-  }
+  #map { position: fixed; inset: 0; z-index: 1; }
 
-  /* Floating frosted-glass panel */
+  /* ── Panel ── */
   #panel {
     position: fixed;
-    top: 16px;
-    left: 16px;
-    bottom: 16px;
-    width: 296px;
+    top: 16px; left: 16px; bottom: 16px;
+    width: 304px;
     z-index: 1000;
-    background: rgba(255, 255, 255, 0.82);
+    background: rgba(255,255,255,0.84);
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
     border-radius: 20px;
-    border: 0.5px solid rgba(0, 0, 0, 0.1);
-    box-shadow:
-      0 2px 4px rgba(0,0,0,0.04),
-      0 8px 24px rgba(0,0,0,0.08),
-      0 24px 64px rgba(0,0,0,0.06);
+    border: 0.5px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.08),0 24px 64px rgba(0,0,0,0.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
   #panel-inner {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px 20px 20px;
+    flex: 1; overflow-y: auto;
+    padding: 22px 18px 16px;
     scrollbar-width: none;
   }
   #panel-inner::-webkit-scrollbar { display: none; }
 
-  /* Typography */
+  /* ── Header ── */
   .title {
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.4px;
-    color: #1d1d1f;
-    line-height: 1.2;
-    margin-bottom: 5px;
+    font-size: 17px; font-weight: 700; letter-spacing: -.4px;
+    color: #1d1d1f; line-height: 1.2; margin-bottom: 4px;
   }
   .subtitle {
-    font-size: 12px;
-    color: #8e8e93;
-    line-height: 1.45;
-    margin-bottom: 22px;
+    font-size: 12px; color: #8e8e93; line-height: 1.45; margin-bottom: 18px;
   }
 
-  /* Stats */
-  .stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 22px;
+  /* ── City switcher ── */
+  .city-switch {
+    display: flex; background: rgba(118,118,128,0.12);
+    border-radius: 10px; padding: 2px; margin-bottom: 18px;
   }
-  .stat-card {
-    background: rgba(0, 0, 0, 0.04);
-    border-radius: 12px;
-    padding: 12px 13px;
+  .city-btn {
+    flex: 1; text-align: center; padding: 7px 4px;
+    font-size: 12px; font-weight: 600; color: #6e6e73;
+    border-radius: 8px; cursor: pointer; user-select: none; line-height: 1.3;
+    transition: background .18s, color .18s, box-shadow .18s;
   }
-  .stat-card .n {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    color: #0071e3;
-    line-height: 1;
-  }
-  .stat-card .lbl {
-    font-size: 11px;
-    color: #8e8e93;
-    margin-top: 4px;
-    line-height: 1.3;
+  .city-btn.active {
+    background: #fff; color: #0071e3;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
   }
 
-  /* Section label */
+  /* ── Section label ── */
   .section-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #8e8e93;
-    margin-bottom: 8px;
-    margin-top: 20px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: #8e8e93;
+    margin: 16px 0 8px;
   }
   .section-label:first-of-type { margin-top: 0; }
 
-  /* Dimension inputs */
-  .dim-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  /* ── Layer cards ── */
+  .layer-card {
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.07);
+    background: rgba(255,255,255,0.6);
     margin-bottom: 8px;
+    overflow: hidden;
+    transition: opacity .2s;
   }
-  .dim-row label {
-    font-size: 13px;
-    color: #1d1d1f;
-    width: 50px;
-    flex-shrink: 0;
-    font-weight: 500;
+  .layer-card.off { opacity: 0.5; }
+
+  .layer-header {
+    display: flex; align-items: center;
+    padding: 11px 13px; gap: 9px;
+    cursor: pointer; user-select: none;
   }
-  .dim-row .sep {
-    font-size: 13px;
-    color: #8e8e93;
-    flex-shrink: 0;
+
+  .layer-dot {
+    width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
   }
+
+  .layer-name {
+    font-size: 13px; font-weight: 600; color: #1d1d1f; flex: 1;
+  }
+
+  .layer-count {
+    font-size: 12px; font-weight: 600; color: #8e8e93;
+    margin-right: 8px; min-width: 36px; text-align: right;
+  }
+
+  /* iOS-style toggle */
+  .toggle {
+    position: relative; width: 36px; height: 22px; flex-shrink: 0;
+  }
+  .toggle input { display: none; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    border-radius: 11px; background: #e5e5ea;
+    transition: background .2s;
+  }
+  .toggle input:checked ~ .toggle-track { background: #34c759; }
+  .toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(14px); }
+
+  /* Layer body (inputs) */
+  .layer-body { padding: 0 13px 12px; }
+
+  .dim-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 7px;
+  }
+  .dim-label {
+    font-size: 12px; color: #6e6e73; width: 44px; flex-shrink: 0;
+  }
+  .dim-sep { font-size: 12px; color: #c7c7cc; flex-shrink: 0; }
+
   input[type=number] {
-    flex: 1;
-    min-width: 0;
-    background: rgba(118, 118, 128, 0.12);
-    border: none;
-    border-radius: 10px;
-    padding: 8px 10px;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    color: #1d1d1f;
-    text-align: center;
-    transition: background 0.15s;
+    flex: 1; min-width: 0;
+    background: rgba(118,118,128,0.10);
+    border: none; border-radius: 8px;
+    padding: 7px 6px; font: inherit; font-size: 13px; font-weight: 500;
+    color: #1d1d1f; text-align: center;
+    transition: background .15s;
     -moz-appearance: textfield;
   }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
-  input[type=number]:focus {
-    outline: none;
-    background: rgba(0, 113, 227, 0.12);
-  }
+  input[type=number]:focus { outline: none; background: rgba(0,113,227,0.1); }
 
-  /* City switcher */
-  .city-switch {
-    display: flex;
-    background: rgba(118, 118, 128, 0.12);
-    border-radius: 10px;
-    padding: 2px;
-    margin-bottom: 20px;
-  }
-  .city-btn {
-    flex: 1;
-    text-align: center;
-    padding: 7px 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #6e6e73;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-    user-select: none;
-    line-height: 1.3;
-  }
-  .city-btn.active {
-    background: #ffffff;
-    color: #0071e3;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-  }
-
-  /* Segmented presets */
-  .presets {
-    display: flex;
-    background: rgba(118, 118, 128, 0.12);
-    border-radius: 10px;
-    padding: 2px;
-    margin-top: 10px;
-    margin-bottom: 0;
-  }
-  .preset {
-    flex: 1;
-    text-align: center;
-    padding: 6px 4px;
-    font-size: 11.5px;
-    font-weight: 500;
-    color: #6e6e73;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-    line-height: 1.3;
-    user-select: none;
-  }
-  .preset.active, .preset:hover {
-    background: #ffffff;
-    color: #0071e3;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-  }
-
-  /* Dropdowns */
+  /* ── Dropdowns ── */
   select {
-    width: 100%;
-    background: rgba(118, 118, 128, 0.12);
-    border: none;
-    border-radius: 10px;
-    padding: 9px 12px;
-    font: inherit;
-    font-size: 13px;
-    color: #1d1d1f;
-    cursor: pointer;
-    appearance: none;
+    width: 100%; background: rgba(118,118,128,0.10);
+    border: none; border-radius: 10px;
+    padding: 9px 30px 9px 12px; font: inherit; font-size: 13px;
+    color: #1d1d1f; cursor: pointer; appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238e8e93'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 30px;
-    transition: background 0.15s;
+    background-repeat: no-repeat; background-position: right 12px center;
+    transition: background .15s;
   }
-  select + select { margin-top: 8px; }
-  select:focus { outline: none; background-color: rgba(0,113,227,0.1); }
+  select + select { margin-top: 7px; }
+  select:focus { outline: none; background-color: rgba(0,113,227,0.08); }
 
-  /* Heatmap */
+  /* ── Hairline ── */
+  .divider { height: 0.5px; background: rgba(0,0,0,0.08); margin: 14px 0; }
+
+  /* ── Heatmap ── */
   #hist {
-    width: 100%;
-    height: 80px;
-    display: block;
-    border-radius: 10px;
-    background: rgba(118, 118, 128, 0.08);
-    margin-top: 8px;
+    width: 100%; height: 78px; display: block;
+    border-radius: 10px; background: rgba(118,118,128,0.07); margin-top: 8px;
   }
   .hist-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: #aeaeb2;
-    margin-top: 4px;
-    padding: 0 2px;
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #aeaeb2; margin-top: 4px; padding: 0 2px;
   }
 
-  /* Legend */
-  .legend {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 14px;
-    font-size: 11.5px;
-    color: #8e8e93;
-  }
-  .legend-swatch {
-    width: 14px; height: 14px;
-    border-radius: 4px;
-    background: rgba(0, 113, 227, 0.45);
-    border: 1.5px solid #0071e3;
-    flex-shrink: 0;
-  }
-
-  /* Hairline divider */
-  .divider {
-    height: 0.5px;
-    background: rgba(0,0,0,0.1);
-    margin: 18px 0;
-  }
-
-  /* Footer */
+  /* ── Footer ── */
   .footer-note {
-    font-size: 10.5px;
-    color: #aeaeb2;
-    line-height: 1.5;
-    padding: 16px 20px;
+    font-size: 10.5px; color: #aeaeb2; line-height: 1.5;
+    padding: 14px 18px;
     border-top: 0.5px solid rgba(0,0,0,0.08);
   }
 
-  /* Loader */
+  /* ── Loader ── */
   #loader {
-    position: fixed;
-    top: 50%;
-    left: calc(160px + 50%);
-    transform: translate(-50%, -50%);
-    background: rgba(255,255,255,0.9);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 14px;
-    border: 0.5px solid rgba(0,0,0,0.08);
+    position: fixed; top: 50%; left: calc(160px + 50%);
+    transform: translate(-50%,-50%);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-radius: 14px; border: 0.5px solid rgba(0,0,0,0.08);
     box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    padding: 14px 22px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #6e6e73;
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    padding: 13px 20px; font-size: 13px; font-weight: 500; color: #6e6e73;
+    z-index: 2000; display: flex; align-items: center; gap: 10px;
   }
   .spinner {
     width: 16px; height: 16px;
-    border: 2px solid rgba(0,113,227,0.2);
-    border-top-color: #0071e3;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
+    border: 2px solid rgba(0,113,227,.2); border-top-color: #0071e3;
+    border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Leaflet popup */
+  /* ── Popup ── */
   .leaflet-popup-content-wrapper {
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 14px;
-    border: 0.5px solid rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-radius: 14px; border: 0.5px solid rgba(0,0,0,0.1);
     box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-    padding: 0;
-    overflow: hidden;
+    padding: 0; overflow: hidden;
   }
   .leaflet-popup-content { margin: 0; }
   .leaflet-popup-tip-container { display: none; }
   .leaflet-popup-close-button {
-    color: #8e8e93 !important;
-    font-size: 18px !important;
-    top: 10px !important;
-    right: 12px !important;
+    color: #8e8e93 !important; font-size: 18px !important;
+    top: 10px !important; right: 12px !important;
   }
-
-  .popup-body { padding: 16px 18px 18px; }
+  .popup-body { padding: 15px 17px 17px; }
   .popup-addr { font-size: 14px; font-weight: 700; color: #1d1d1f;
-    letter-spacing: -0.2px; padding-right: 18px; }
-  .popup-blklot { font-size: 11px; color: #8e8e93; margin-top: 2px; margin-bottom: 12px; }
-  .popup-grid { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; }
+    letter-spacing: -.2px; padding-right: 18px; }
+  .popup-sub { font-size: 11px; color: #8e8e93; margin-top: 2px; margin-bottom: 10px; }
+  .popup-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
   .popup-grid .k { font-size: 12px; color: #8e8e93; }
   .popup-grid .v { font-size: 12px; font-weight: 600; color: #1d1d1f; }
 
-  /* Leaflet control styling */
+  /* ── Zoom control ── */
   .leaflet-control-zoom {
-    border: none !important;
-    border-radius: 12px !important;
-    overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.1) !important;
+    border: none !important; border-radius: 12px !important; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.1) !important;
   }
   .leaflet-control-zoom a {
-    background: rgba(255,255,255,0.9) !important;
-    backdrop-filter: blur(10px);
-    color: #1d1d1f !important;
-    border: none !important;
-    font-size: 16px !important;
-    line-height: 28px !important;
-    width: 30px !important;
-    height: 30px !important;
+    background: rgba(255,255,255,0.92) !important; backdrop-filter: blur(10px);
+    color: #1d1d1f !important; border: none !important;
+    width: 30px !important; height: 30px !important;
+    line-height: 30px !important; font-size: 16px !important;
   }
   .leaflet-control-zoom a:hover { background: white !important; }
 </style>
@@ -369,114 +251,175 @@
       <div class="city-btn" data-city="cc">Culver City</div>
     </div>
 
-    <div class="stats">
-      <div class="stat-card">
-        <div class="n" id="count">—</div>
-        <div class="lbl">matching parcels</div>
+    <!-- ── Layer cards ── -->
+    <div class="section-label">Layers</div>
+
+    <!-- Blue -->
+    <div class="layer-card" id="card-blue">
+      <div class="layer-header">
+        <div class="layer-dot" style="background:#0071e3"></div>
+        <div class="layer-name">Layer 1</div>
+        <div class="layer-count" id="count-blue">—</div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-blue" checked />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
       </div>
-      <div class="stat-card">
-        <div class="n" id="pct">—</div>
-        <div class="lbl">of residential‑zoned lots</div>
+      <div class="layer-body">
+        <div class="dim-row">
+          <span class="dim-label">Width</span>
+          <input type="number" id="blue-wMin" value="24" step="0.5" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="blue-wMax" value="30" step="0.5" />
+        </div>
+        <div class="dim-row" style="margin-bottom:0">
+          <span class="dim-label">Length</span>
+          <input type="number" id="blue-lMin" value="80" step="1" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="blue-lMax" value="120" step="1" />
+        </div>
       </div>
     </div>
 
-    <div class="section-label">Dimensions</div>
-
-    <div class="dim-row">
-      <label>Width</label>
-      <input type="number" id="wMin" min="24" max="30" step="0.5" value="24" />
-      <span class="sep">–</span>
-      <input type="number" id="wMax" min="24" max="30" step="0.5" value="30" />
+    <!-- Yellow -->
+    <div class="layer-card off" id="card-yellow">
+      <div class="layer-header">
+        <div class="layer-dot" style="background:#d97706"></div>
+        <div class="layer-name">Layer 2</div>
+        <div class="layer-count" id="count-yellow">—</div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-yellow" />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="layer-body">
+        <div class="dim-row">
+          <span class="dim-label">Width</span>
+          <input type="number" id="yellow-wMin" value="24" step="0.5" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="yellow-wMax" value="30" step="0.5" />
+        </div>
+        <div class="dim-row" style="margin-bottom:0">
+          <span class="dim-label">Length</span>
+          <input type="number" id="yellow-lMin" value="80" step="1" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="yellow-lMax" value="120" step="1" />
+        </div>
+      </div>
     </div>
-    <div class="dim-row">
-      <label>Length</label>
-      <input type="number" id="lMin" min="80" max="120" step="1" value="80" />
-      <span class="sep">–</span>
-      <input type="number" id="lMax" min="80" max="120" step="1" value="120" />
-    </div>
 
-    <div class="presets">
-      <div class="preset active" data-w="24,30" data-l="80,120">Flexible<br/>24–30 × 80–120</div>
-      <div class="preset" data-w="24,26" data-l="95,105">Ideal<br/>~25 × 100</div>
+    <!-- Red -->
+    <div class="layer-card off" id="card-red">
+      <div class="layer-header">
+        <div class="layer-dot" style="background:#dc2626"></div>
+        <div class="layer-name">Layer 3</div>
+        <div class="layer-count" id="count-red">—</div>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-red" />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="layer-body">
+        <div class="dim-row">
+          <span class="dim-label">Width</span>
+          <input type="number" id="red-wMin" value="24" step="0.5" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="red-wMax" value="30" step="0.5" />
+        </div>
+        <div class="dim-row" style="margin-bottom:0">
+          <span class="dim-label">Length</span>
+          <input type="number" id="red-lMin" value="80" step="1" />
+          <span class="dim-sep">–</span>
+          <input type="number" id="red-lMax" value="120" step="1" />
+        </div>
+      </div>
     </div>
 
     <div class="divider"></div>
 
-    <div class="section-label" data-filter>Neighborhood</div>
+    <!-- ── Filters ── -->
+    <div class="section-label" id="filter-label">Neighborhood</div>
     <select id="nbh"><option value="">All neighborhoods</option></select>
     <select id="zon"><option value="">All zoning codes</option></select>
 
     <div class="divider"></div>
 
+    <!-- ── Heatmap ── -->
     <div class="section-label">Distribution</div>
-    <canvas id="hist" width="256" height="80"></canvas>
+    <canvas id="hist" width="268" height="78"></canvas>
     <div class="hist-labels">
       <span>24 ft wide</span><span>30 ft wide</span>
-    </div>
-
-    <div class="legend">
-      <div class="legend-swatch"></div>
-      Single-stair eligible parcel
     </div>
 
   </div>
 
   <div class="footer-note">
     Geometric filter only — does not check height limits, setbacks, or existing structures.
-    Source: SF Open Data, 2026-05-22. Dimensions from minimum rotated rectangle in EPSG:2227.
+    Source: SF Open Data 2026-05-22 · Culver City OpenGIS 2025.
+    Dimensions from minimum rotated rectangle (EPSG:2227 / 2229).
   </div>
 </div>
 
-<div id="loader">
+<div id="loader" style="display:none">
   <div class="spinner"></div>
-  <span>Loading parcel data…</span>
+  <span>Loading…</span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
+// ─── City config ────────────────────────────────────────────────────────────
 const CITIES = {
   sf: {
-    center: [37.7749, -122.4400], zoom: 13,
+    center: [37.7749, -122.44], zoom: 13,
     file: 'lots.geojson',
-    totalResidential: 189636,
-    residentialLabel: 'of residential-zoned lots',
-    // property keys in the geojson
-    keys: { w: 'w', l: 'l', area: 'a', zoning: 'z', label: 'n', labelKey: 'n' },
-    popupFn: p => {
-      const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa || '');
-      const street = [p.sn, p.st].filter(Boolean).join(' ');
-      return { title: `${addr} ${street}`, sub: `Block-lot ${p.b || '—'}`,
-        rows: [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
-               ['Area',`${Number(p.a).toLocaleString()} sq ft`],
-               ['Zoning', p.z||'—'],['Neighborhood', p.n||'—'],
-               ['Supervisor', p.sd ? `District ${p.sd}` : '—']] };
-    },
+    totalRes: 189636,
+    keys: { w:'w', l:'l', area:'a', zone:'z', filterKey:'n' },
     filterLabel: 'Neighborhood',
-    filterKey: 'n',
+    popupFn: p => {
+      const addr = (p.fa && p.ta && p.fa !== p.ta) ? `${p.fa}–${p.ta}` : (p.fa||'');
+      return {
+        title: `${addr} ${[p.sn,p.st].filter(Boolean).join(' ')}`,
+        sub:   `Block-lot ${p.b||'—'}`,
+        rows:  [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
+                ['Area',`${(+p.a).toLocaleString()} sq ft`],
+                ['Zoning',p.z||'—'],['Neighborhood',p.n||'—'],
+                ['Supervisor', p.sd?`District ${p.sd}`:'—']],
+      };
+    },
   },
   cc: {
     center: [34.0084, -118.4092], zoom: 14,
     file: 'cc_lots.geojson',
-    totalResidential: 7401,
-    residentialLabel: 'of residential-zoned lots',
-    keys: { w: 'w', l: 'l', area: 'sq', zoning: 'z' },
-    popupFn: p => ({
-      title: p.ad || '—', sub: `APN ${p.a || '—'}`,
-      rows: [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
-             ['Area',`${Number(p.sq).toLocaleString()} sq ft`],
-             ['Zoning', p.z||'—'],['Zoning name', p.zf||'—']],
-    }),
+    totalRes: 7401,
+    keys: { w:'w', l:'l', area:'sq', zone:'z', filterKey:'z' },
     filterLabel: 'Zoning',
-    filterKey: 'z',
+    popupFn: p => ({
+      title: p.ad||'—', sub:`APN ${p.a||'—'}`,
+      rows: [['Width',`${p.w} ft`],['Length',`${p.l} ft`],
+             ['Area',`${(+p.sq).toLocaleString()} sq ft`],
+             ['Zoning',p.z||'—'],['Zoning name',p.zf||'—']],
+    }),
   },
 };
 
-let currentCity = 'sf';
-let allFeatures = [];
-let layer = null;
-let cityData = {};  // cache loaded data per city
+// ─── Layer config ────────────────────────────────────────────────────────────
+const LAYERS = {
+  blue:   { stroke:'#0071e3', fill:'#0071e3', opacity:.42 },
+  yellow: { stroke:'#b45309', fill:'#f59e0b', opacity:.45 },
+  red:    { stroke:'#b91c1c', fill:'#ef4444', opacity:.42 },
+};
 
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentCity = 'sf';
+let allFeatures  = [];
+let cityData     = {};
+const mapLayers  = { blue: null, yellow: null, red: null };
+
+// ─── Map setup ───────────────────────────────────────────────────────────────
 const map = L.map('map', { preferCanvas: true, zoomControl: true })
   .setView(CITIES.sf.center, CITIES.sf.zoom);
 
@@ -486,189 +429,195 @@ L.tileLayer(
 ).addTo(map);
 
 map.zoomControl.setPosition('bottomright');
-
 const renderer = L.canvas({ padding: 0.5 });
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const els = {
-  wMin: $('wMin'), wMax: $('wMax'), lMin: $('lMin'), lMax: $('lMax'),
-  nbh: $('nbh'), zon: $('zon'), count: $('count'), pct: $('pct'), hist: $('hist'),
-  filterLabel: document.querySelector('label[for="nbh"]'),
-};
 
-const LOT_STYLE = { color:'#0071e3', weight:0.8, fillColor:'#0071e3', fillOpacity:0.38, renderer };
-
-function popupHtml(p) {
-  const cfg = CITIES[currentCity];
-  const { title, sub, rows } = cfg.popupFn(p);
-  return `<div class="popup-body">
-    <div class="popup-addr">${title}</div>
-    <div class="popup-blklot">${sub}</div>
-    <div class="popup-grid">${rows.map(([k,v]) =>
-      `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}
-    </div></div>`;
-}
-
-function passes(p, wMin, wMax, lMin, lMax, filterVal, zon) {
+function passes(p, wMin, wMax, lMin, lMax) {
   const cfg = CITIES[currentCity];
   const w = p[cfg.keys.w], l = p[cfg.keys.l];
-  if (!w || !l) return false;
-  if (w < wMin || w > wMax || l < lMin || l > lMax) return false;
-  if (filterVal && p[cfg.filterKey] !== filterVal) return false;
-  if (zon && p[cfg.keys.zoning] !== zon) return false;
-  return true;
+  return w && l && w >= wMin && w <= wMax && l >= lMin && l <= lMax
+      && (!$('nbh').value || p[cfg.keys.filterKey] === $('nbh').value)
+      && (!$('zon').value  || p[cfg.keys.zone]      === $('zon').value);
 }
 
-function render() {
-  const wMin = +els.wMin.value, wMax = +els.wMax.value;
-  const lMin = +els.lMin.value, lMax = +els.lMax.value;
-  const filterVal = els.nbh.value, zon = els.zon.value;
+function popupHtml(p) {
+  const { title, sub, rows } = CITIES[currentCity].popupFn(p);
+  return `<div class="popup-body">
+    <div class="popup-addr">${title}</div>
+    <div class="popup-sub">${sub}</div>
+    <div class="popup-grid">${rows.map(([k,v]) =>
+      `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>
+  </div>`;
+}
 
-  const filtered = allFeatures.filter(f =>
-    passes(f.properties, wMin, wMax, lMin, lMax, filterVal, zon));
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderLayer(id) {
+  const on   = $(`tog-${id}`).checked;
+  const wMin = +$(`${id}-wMin`).value, wMax = +$(`${id}-wMax`).value;
+  const lMin = +$(`${id}-lMin`).value, lMax = +$(`${id}-lMax`).value;
 
-  if (layer) map.removeLayer(layer);
-  layer = L.geoJSON({ type:'FeatureCollection', features: filtered }, {
-    style: () => LOT_STYLE,
+  if (mapLayers[id]) { map.removeLayer(mapLayers[id]); mapLayers[id] = null; }
+
+  if (!on || !allFeatures.length) {
+    $(`count-${id}`).textContent = '—';
+    return;
+  }
+
+  const filtered = allFeatures.filter(f => passes(f.properties, wMin, wMax, lMin, lMax));
+  const { stroke, fill, opacity } = LAYERS[id];
+
+  mapLayers[id] = L.geoJSON({ type:'FeatureCollection', features: filtered }, {
+    style: () => ({ color: stroke, weight: 0.8, fillColor: fill, fillOpacity: opacity, renderer }),
     onEachFeature: (f, l) => l.bindPopup(popupHtml(f.properties), { maxWidth: 240 }),
   }).addTo(map);
 
-  const cfg = CITIES[currentCity];
-  els.count.textContent = filtered.length.toLocaleString();
-  els.pct.textContent   = (100 * filtered.length / cfg.totalResidential).toFixed(1) + '%';
-  drawHist(filtered);
+  $(`count-${id}`).textContent = filtered.length.toLocaleString();
+  return filtered;
 }
 
-function drawHist(features) {
-  const cnv = els.hist, ctx = cnv.getContext('2d');
+function render() {
+  const results = {};
+  for (const id of ['blue','yellow','red']) results[id] = renderLayer(id);
+  drawHist(results);
+}
+
+// ─── Heatmap ─────────────────────────────────────────────────────────────────
+function drawHist(results) {
+  const cnv = $('hist'), ctx = cnv.getContext('2d');
   const W = cnv.width, H = cnv.height;
   ctx.clearRect(0, 0, W, H);
   const wBins = 12, lBins = 40;
-  const grid = new Uint32Array(wBins * lBins);
-  let maxC = 0;
+  const grids = {};
+  const maxes = {};
   const cfg = CITIES[currentCity];
-  for (const { properties: p } of features) {
-    const wi = Math.min(wBins-1, Math.max(0, Math.floor((p[cfg.keys.w] - 24) * 2)));
-    const li = Math.min(lBins-1, Math.max(0, Math.floor(p[cfg.keys.l] - 80)));
-    grid[li * wBins + wi]++;
-    if (grid[li * wBins + wi] > maxC) maxC = grid[li * wBins + wi];
-  }
-  if (!maxC) return;
-  const cw = W / wBins, ch = H / lBins;
-  for (let li = 0; li < lBins; li++)
-    for (let wi = 0; wi < wBins; wi++) {
-      const v = grid[li * wBins + wi];
-      if (!v) continue;
-      ctx.fillStyle = `rgba(0,113,227,${0.08 + 0.82 * Math.pow(v/maxC, 0.5)})`;
-      ctx.fillRect(wi * cw, (lBins-1-li) * ch, cw, ch);
+
+  for (const [id, feats] of Object.entries(results)) {
+    if (!feats || !$(`tog-${id}`).checked) continue;
+    const g = new Uint32Array(wBins * lBins);
+    let mx = 0;
+    for (const { properties: p } of feats) {
+      const wi = Math.min(wBins-1, Math.max(0, Math.floor((p[cfg.keys.w]-24)*2)));
+      const li = Math.min(lBins-1, Math.max(0, Math.floor(p[cfg.keys.l]-80)));
+      g[li*wBins+wi]++;
+      if (g[li*wBins+wi] > mx) mx = g[li*wBins+wi];
     }
+    grids[id] = g; maxes[id] = mx;
+  }
+
+  const cw = W/wBins, ch = H/lBins;
+  const hexToRgb = hex => [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)];
+  const fillColors = { blue:[0,113,227], yellow:[245,158,11], red:[239,68,68] };
+
+  for (let li = 0; li < lBins; li++) {
+    for (let wi = 0; wi < wBins; wi++) {
+      // Blend: draw each layer's contribution
+      for (const id of ['blue','yellow','red']) {
+        if (!grids[id]) continue;
+        const v = grids[id][li*wBins+wi];
+        if (!v) continue;
+        const t = Math.pow(v/maxes[id], 0.5);
+        const [r,g,b] = fillColors[id];
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.07 + 0.75*t})`;
+        ctx.fillRect(wi*cw, (lBins-1-li)*ch, cw, ch);
+      }
+    }
+  }
 }
 
+// ─── Dropdowns ───────────────────────────────────────────────────────────────
 function populateDropdowns() {
   const cfg = CITIES[currentCity];
-  // Primary filter (neighborhood for SF, zoning for CC)
-  els.nbh.innerHTML = `<option value="">All ${cfg.filterLabel.toLowerCase()}s</option>`;
-  // Secondary filter (zoning)
-  els.zon.innerHTML = '<option value="">All zoning codes</option>';
+  $('nbh').innerHTML = `<option value="">All ${cfg.filterLabel.toLowerCase()}s</option>`;
+  $('zon').innerHTML = '<option value="">All zoning codes</option>';
+  $('filter-label').textContent = cfg.filterLabel;
 
   const fMap = new Map(), zMap = new Map();
   for (const { properties: p } of allFeatures) {
-    const fv = p[cfg.filterKey], zv = p[cfg.keys.zoning];
+    const fv = p[cfg.keys.filterKey], zv = p[cfg.keys.zone];
     if (fv) fMap.set(fv, (fMap.get(fv)||0)+1);
     if (zv) zMap.set(zv, (zMap.get(zv)||0)+1);
   }
   const sorted = m => [...m.entries()].sort((a,b) => b[1]-a[1]);
   for (const [k,v] of sorted(fMap)) {
-    const o = document.createElement('option');
-    o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
-    els.nbh.appendChild(o);
+    const o = new Option(`${k} (${v.toLocaleString()})`, k);
+    $('nbh').appendChild(o);
   }
   for (const [k,v] of sorted(zMap)) {
-    const o = document.createElement('option');
-    o.value = k; o.textContent = `${k} (${v.toLocaleString()})`;
-    els.zon.appendChild(o);
+    const o = new Option(`${k} (${v.toLocaleString()})`, k);
+    $('zon').appendChild(o);
   }
-  // Update label
-  document.querySelector('.section-label[data-filter]').textContent = cfg.filterLabel;
 }
 
+// ─── City loading ─────────────────────────────────────────────────────────────
 function loadCity(cityKey) {
   currentCity = cityKey;
-  const cfg = CITIES[cityKey];
-
-  // Update city buttons
   document.querySelectorAll('.city-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.city === cityKey));
+  map.flyTo(CITIES[cityKey].center, CITIES[cityKey].zoom, { duration: 1.2 });
 
-  // Fly to city
-  map.flyTo(cfg.center, cfg.zoom, { duration: 1.2 });
+  for (const id of ['blue','yellow','red']) {
+    if (mapLayers[id]) { map.removeLayer(mapLayers[id]); mapLayers[id] = null; }
+    $(`count-${id}`).textContent = '—';
+  }
 
-  // Clear existing layer
-  if (layer) { map.removeLayer(layer); layer = null; }
-  els.count.textContent = '—'; els.pct.textContent = '—';
-
-  // Use cache if available
   if (cityData[cityKey]) {
     allFeatures = cityData[cityKey];
     populateDropdowns(); render(); return;
   }
 
-  $('loader').style.display = 'flex';
-  $('loader').querySelector('span').textContent = `Loading ${cfg.file}…`;
+  const loader = $('loader');
+  loader.style.display = 'flex';
+  loader.querySelector('span').textContent = `Loading ${CITIES[cityKey].file}…`;
 
-  fetch(cfg.file)
+  fetch(CITIES[cityKey].file)
     .then(r => r.json())
     .then(data => {
       cityData[cityKey] = data.features;
       allFeatures = data.features;
-      populateDropdowns();
-      render();
-      $('loader').style.display = 'none';
+      populateDropdowns(); render();
+      loader.style.display = 'none';
     })
-    .catch(err => {
-      $('loader').querySelector('span').textContent = '⚠️ ' + err;
-    });
+    .catch(err => { loader.querySelector('span').textContent = '⚠️ ' + err; });
 }
 
-// City switcher
+// ─── Events ──────────────────────────────────────────────────────────────────
+// Toggles
+for (const id of ['blue','yellow','red']) {
+  $(`tog-${id}`).addEventListener('change', () => {
+    $(`card-${id}`).classList.toggle('off', !$(`tog-${id}`).checked);
+    render();
+  });
+  // Inputs
+  for (const field of ['wMin','wMax','lMin','lMax']) {
+    $(`${id}-${field}`).addEventListener('change', render);
+    $(`${id}-${field}`).addEventListener('input',  render);
+  }
+}
+
+// Filters
+$('nbh').addEventListener('change', render);
+$('zon').addEventListener('change', render);
+
+// City switch
 document.querySelectorAll('.city-btn').forEach(el =>
   el.addEventListener('click', () => loadCity(el.dataset.city)));
 
-// Preset segmented control
-document.querySelectorAll('.preset').forEach(el => {
-  el.addEventListener('click', () => {
-    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
-    el.classList.add('active');
-    const [wMin, wMax] = el.dataset.w.split(',');
-    const [lMin, lMax] = el.dataset.l.split(',');
-    els.wMin.value = wMin; els.wMax.value = wMax;
-    els.lMin.value = lMin; els.lMax.value = lMax;
-    render();
-  });
-});
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+const loader = $('loader');
+loader.style.display = 'flex';
+loader.querySelector('span').textContent = 'Loading San Francisco…';
 
-['wMin','wMax','lMin','lMax'].forEach(id =>
-  $(id).addEventListener('change', () => {
-    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
-    render();
-  }));
-
-['nbh','zon'].forEach(id => $(id).addEventListener('change', render));
-
-// Initial load
-$('loader').style.display = 'flex';
 fetch('lots.geojson')
   .then(r => r.json())
   .then(data => {
     cityData['sf'] = data.features;
     allFeatures = data.features;
-    populateDropdowns();
-    render();
-    $('loader').style.display = 'none';
+    populateDropdowns(); render();
+    loader.style.display = 'none';
   })
-  .catch(err => {
-    $('loader').querySelector('span').textContent = '⚠️ ' + err;
-  });
+  .catch(err => { loader.querySelector('span').textContent = '⚠️ ' + err; });
 </script>
 </body>
 </html>
