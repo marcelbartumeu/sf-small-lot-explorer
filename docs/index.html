@@ -453,10 +453,15 @@ function popupHtml(p) {
 }
 
 // ─── Render ──────────────────────────────────────────────────────────────────
+function readVal(id, fallback) {
+  const v = $(id).value.trim();
+  return v === '' ? fallback : +v;
+}
+
 function renderLayer(id) {
   const on   = $(`tog-${id}`).checked;
-  const wMin = +$(`${id}-wMin`).value, wMax = +$(`${id}-wMax`).value;
-  const lMin = +$(`${id}-lMin`).value, lMax = +$(`${id}-lMax`).value;
+  const wMin = readVal(`${id}-wMin`, 0),        wMax = readVal(`${id}-wMax`, Infinity);
+  const lMin = readVal(`${id}-lMin`, 0),        lMax = readVal(`${id}-lMax`, Infinity);
 
   if (mapLayers[id]) { map.removeLayer(mapLayers[id]); mapLayers[id] = null; }
 
